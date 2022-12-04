@@ -9,20 +9,11 @@ main :: () {
 }
 
 
-part2 :: ($input: string) {
-    print("part 2 ------------------------------------------\n");
-    tmp :: "azAZ";
+part2 :: (input: string) {
     A :: #char "A";
     a :: #char "a";
-    print("a = %, z = %, A = %, Z = %\n", tmp.data[0], tmp.data[1], tmp.data[2], tmp.data[3]);
-    
-
-    print("input = \n");
-    print(input);
-
     res := 0;
-
-    checks : [52]u8;
+    checks : [52]u8 = ---;
 
     for split(input, "\n") {
         if it.count == 0 continue;
@@ -32,25 +23,19 @@ part2 :: ($input: string) {
             for *c: checks { <<c = 1; };
 
         line := slice(it, 0, it.count-1);
-        print("line = %\n", line);
 
         for i: 0..line.count-1 {
             c := line.data[i];
-            // print("c = ");
-            // print_character(c);
-            // print(" = %", c);
             if c <= 90 then c = c - A + 26;
             else            c = c - a;
-            // print(" > %\n", c);
 
             if it_index % 3 == 0 && checks[c] % 2 != 0 then checks[c] *= 2;
             if it_index % 3 == 1 && checks[c] % 3 != 0 then checks[c] *= 3;
             if it_index % 3 == 2 && checks[c] % 5 != 0 then checks[c] *= 5;
         }
 
-        for c, i: checks {
+        for c, i: checks
             if c % (2*3*5) == 0 then res += i + 1;
-        }
     }
 
     print("res = %\n", res);
