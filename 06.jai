@@ -23,6 +23,8 @@ part :: (input : string, $N: int = 4) {
 
         if i < N continue;
 
+        // * could optimize, by only comparing the new entry to the other ones, 
+        // * since they already got checked for each other.
         for a: 0..N-1 for b: a+1..N-1
             if four[a] == four[b] then continue i;
 
