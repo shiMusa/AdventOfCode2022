@@ -19,14 +19,12 @@ main :: () {
 part :: (input : string, $N: int = 4) {
     four : [N]u8;
     for i: 0..input.count-1 {
-        byte := input[i];
-        four[i % N] = byte;
+        four[i % N] = input[i];
 
         if i < N continue;
 
-        for a: 0..N-1 { for b: a+1..N-1 {
+        for a: 0..N-1 for b: a+1..N-1
             if four[a] == four[b] then continue i;
-        }}
 
         print("index = %\n", i+1);
         break;
