@@ -83,6 +83,53 @@ part :: ($input: string) {
         if visible[r][c] then total_visible += 1;
 
     print("visible : %\n", total_visible);
+
+
+    // Part 2, I'm tired, let's make it simple and stupid
+
+    tree_scores : [rows][cols]int;
+    score := 0;
+
+    for r: 0..rows-1 for c: 0.. cols-1 {
+        DEBUG :: false;
+        height := lines[r][c];
+
+        // up
+        up := 0;
+        for <i: r-1..0 {
+            up += 1;
+            if lines[i][c] >= height break;
+        }
+
+        // down
+        down := 0;
+        for i: r+1..rows-1 {
+            down += 1;
+            if lines[i][c] >= height then break;
+        }
+
+        left := 0;
+        for <i: c-1..0 {
+            left += 1;
+            if lines[r][i] >= height then break;
+        }
+
+        right := 0;
+        for i: c+1..cols-1 {
+            right += 1;
+            if lines[r][i] >= height then break;
+        }
+
+        #if DEBUG print("(%,%) : u %, d %, l %, r %\n", r, c, up, down, left, right);
+
+        new_score := up * down * left * right;
+        tree_scores[r][c] = new_score;
+        if new_score > score then score = new_score;
+    }
+
+    for tree_scores print("%\n", it);
+
+    print("highest score : %\n", score);
 }
 
 test :: #string DONE
