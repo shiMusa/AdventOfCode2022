@@ -112,7 +112,7 @@ update_parent_size :: (id: int) {
 }
 
 part :: (input : string) {
-    DEBUG :: true;
+    DEBUG :: false;
 
     home := add_dir(".");
     current_directory := home;
@@ -164,7 +164,26 @@ part :: (input : string) {
     for directory_sizes
         if it <= 100000 res += it;
 
-    print("res = %\n", res);
+    print("part 1 : %\n", res);
+
+    // Part 2 //////////////////////////////////////////////////////////////////
+
+    max_disc_space :: 70000000;
+    needed         :: 30000000;
+
+    home_size := directory_sizes[0];
+    smallest  := home_size; // home is always the largest directory
+
+    remaining := max_disc_space - home_size;
+
+    for directory_sizes {
+        if remaining + it >= needed {
+            if it <= smallest then smallest = it;
+        }
+    }
+
+    print("part 2 : %\n", smallest);
+
 }
 
 test :: #string DONE
