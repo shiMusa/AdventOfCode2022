@@ -4,9 +4,11 @@
 #import "String";
 #import "File";
 #import "Math";
+#import "Sort";
 
 main :: () {
-    part_1(check);
+    // part_1(check);
+    part_2(check);
 }
 
 
@@ -16,6 +18,7 @@ Entry :: enum u8 {
 }
 
 Construct :: struct {
+    raw : string;
     entries : [..]Entry;
     entry_index : [..]int;
     list_indices : [..][..]int;
@@ -113,6 +116,7 @@ compare :: (ca: Construct, a: int, cb: Construct, b: int) -> s8 {
             if cmp == 1  return 1;
             if cmp == -1 return -1;
         }
+        #if DEBUG print("compare list counts: %:%:%, %:%:%\n", a, la, la.count, b, lb, lb.count);
         if la.count == lb.count return 0;
         if la.count  < lb.count return 1;
         if la.count  > lb.count return -1;
@@ -122,20 +126,62 @@ compare :: (ca: Construct, a: int, cb: Construct, b: int) -> s8 {
     // one entry is a value, the other a list
     if ca.entries[a] == .VALUE {
         #if DEBUG print("compare VALUE & LIST: %, %\n", a, cb.list_indices[cb.entry_index[b]]);
-        list := add_list(ca);
-        parent := find_parent(ca, a);
-        append(ca, list, a);
-        replace(ca, parent, a, list);
 
-        return compare(ca, list, cb, b);
+        rhs_list := cb.list_indices[cb.entry_index[b]];
+        list_count := rhs_list.count;
+        if !rhs_list return -1;
+        rhs_index := rhs_list[0];
+        while cb.entries[rhs_index] == .LIST {
+            rhs_list = cb.list_indices[cb.entry_index[rhs_index]];
+            if !rhs_list return -1;
+            rhs_index = rhs_list[0];
+        }
+
+        res := compare(ca, a, cb, rhs_index);
+
+        if res == 1  return 1;
+        if res == -1 return -1;
+
+        // res == 0
+        if list_count > 1 return -1; 
+        return 0;
+
+        // rhs_value := cb.values[cb.entry_index[rhs_index]];
+
+        // list := add_list(ca);
+        // parent := find_parent(ca, a);
+        // append(ca, list, a);
+        // replace(ca, parent, a, list);
+
+        // return compare(ca, list, cb, b);
     } else {
         #if DEBUG print("compare LIST & VALUE: %, %\n", ca.list_indices[ca.entry_index[a]], b);
-        list := add_list(cb);
-        parent := find_parent(cb, b);
-        append(cb, list, b);
-        replace(cb, parent, b, list);
+        
+        lhs_list := ca.list_indices[ca.entry_index[a]];
+        list_count := lhs_list.count;
+        if !lhs_list return 1;
+        lhs_index := lhs_list[0];
+        while ca.entries[lhs_index] == .LIST {
+            lhs_list = ca.list_indices[ca.entry_index[lhs_index]];
+            if !lhs_list return 1;
+            lhs_index = lhs_list[0];
+        }
 
-        return compare(ca, a, cb, list);
+        res := compare(ca, lhs_index, cb, b);
+
+        if res == 1  return 1;
+        if res == -1 return -1;
+
+        // res == 0
+        if list_count > 1 return -1; 
+        return 0;
+
+        // list := add_list(cb);
+        // parent := find_parent(cb, b);
+        // append(cb, list, b);
+        // replace(cb, parent, b, list);
+
+        // return compare(ca, a, cb, list);
     }
 }
 
@@ -204,6 +250,112 @@ part_1 :: (input: string) {
     print("res = %\n", res);
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+parse :: (input_line: string) -> Construct {
+    DEBUG :: false;
+
+    c : Construct;
+    c.raw = input_line;
+
+    tmp := replace(input_line, "[", "[,");
+    line := replace(tmp, "]", ",]");
+
+    words := split(line, ",");
+    #if DEBUG print("words = %\n", words);
+
+    // parse
+    current_list := -1;
+    for i: 0..words.count-1 {
+        if words[i] == {
+            case "[";
+                list := add_list(c);
+                if current_list != -1
+                    append(c, current_list, list);
+                current_list = list;
+            case "]";
+                if current_list == -1 continue;
+                parent := find_parent(c, current_list);
+                current_list = parent;
+            case;
+                #if DEBUG print("words[%].count = %; words[%] = %\n", i, words[i].count, i, words[i]);
+                if words[i].count == 0 continue i;
+                val := parse_int(*words[i]);
+                ival := add_value(c, val);
+                append(c, current_list, ival);
+        }
+
+        #if DEBUG print("i % : current %, %\n", i, current_list, c);
+    }
+
+    #if DEBUG | true print("parsed: %\n", c);
+
+    return c;
+}
+
+
+
+
+
+part_2 :: (input: string) {
+    DEBUG :: false;
+
+    constructs : [..]Construct;
+    
+    for :trimmed input {
+        print("% : %\n", it_index, it);
+
+        array_add(*constructs, parse(it));
+    }
+
+    marker_0 := parse("[[6]]");
+    marker_1 := parse("[[2]]");
+    array_add(*constructs, marker_0);
+    array_add(*constructs, marker_1);
+
+    cmp :: (a: Construct, b: Construct) -> s64 {
+        DEBUG :: false;
+        #if DEBUG print("cmp \na = %\nb = %\n", a, b);
+        return -cast(s64)compare(a, 0, b, 0);
+    }
+
+    bubble_sort(constructs, cmp);
+
+    res := 1;
+    for constructs {
+        print("%: %\n", it_index, it.raw);
+        if it.raw == marker_0.raw || it.raw == marker_1.raw {
+            res *= it_index+1;
+            #if DEBUG print("found marker at position %\n", it_index+1);
+        }
+    }
+
+    print("res = %\n", res);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 trimmed :: (txt: *string, body: Code, flags: For_Flags) #expand {
     i := 0;
     for l: split(<<txt, "\n") {
@@ -217,6 +369,15 @@ trimmed :: (txt: *string, body: Code, flags: For_Flags) #expand {
         #insert body;
     }
 }
+
+
+test_debug :: #string DONE
+[1,[2,[3,[4,[5,6,7]]]],8,9]
+[1,[2,[3,[4,[5,6,0]]]],8,9]
+
+[[1],[2,3,4]]
+[[1],4]
+DONE
 
 test :: #string DONE
 [1,1,3,1,1]
