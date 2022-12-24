@@ -1,7 +1,27 @@
 #load "preload.jai";
 
 main :: () {
-    part_1(check);
+
+    // a := int.[1,2,3,6,7,9,10,11];
+    // for i:0..11 
+    //     print("searching for %: % ----------------------\n", 
+    //         i, array_find_sorted(a, i));
+
+    // b : [..]int;
+    // array_add(*b, 1,2,3,6,7,9,10,11);
+    // print("b = %\n", b);
+    // print("insert %: %\n", 7, array_insert_sorted(*b, 7, true));
+    // print("b = %\n", b);
+    // print("insert %: %\n", 7, array_insert_sorted(*b, 7));
+    // print("b = %\n", b);
+    // print("insert %: %\n", 4, array_insert_sorted(*b, 4));
+    // print("b = %\n", b);
+    // print("insert %: %\n", 0, array_insert_sorted(*b, 0));
+    // print("b = %\n", b);
+    // print("insert %: %\n", 42, array_insert_sorted(*b, 42));
+    // print("b = %\n", b);
+
+    part_1(test);
 }
 
 
@@ -11,74 +31,115 @@ Tile :: enum u8 {
     AIR;
 }
 
-Map :: struct {
-    positions : [..][2]int;
+Column :: struct {
+    y_pos : [..]int;
     tiles : [..]Tile;
 }
-index_of :: (m: Map, x: int, y: int) -> int {
-    for m.positions if it[0] == x && it[1] == y then 
-        return it_index;
+get :: (c: Column, y: int) -> Tile {
+    i := array_find_sorted(c.y_pos, y);
+    return ifx i == -1 then .AIR else c.tiles[i];
+}
+set :: (c: *Column, y: int, tile: Tile) -> int {
+    DEBUG :: false;
+    #if DEBUG print("set: Column %, y %, tile %\n", <<c, y, tile);
+    i, new_entry := array_insert_sorted(*c.y_pos, y, true);
+    #if DEBUG print("    i %, new_entry %\n", i, new_entry);
+    if new_entry then array_insert_at(*c.tiles, tile, i);
+    #if DEBUG print("column after adding tile: %\n", <<c);
+    return i;
+}
+find_next_floor :: (c: Column, from_y: int) -> int {
+    i := array_find_sorted(c.y_pos, from_y, true);
+    i += 1;
+    if i >= c.y_pos.count-1 then return -1; // no floor
+    return i;
+}
+
+Map :: struct {
+    column_postions : [..]int;
+    columns : [..]Column;
+}
+column_index_of :: (m: Map, x: int) -> int {
+    for m.column_postions if it == x then return it_index;
     return -1;
 }
+index_of :: (m: Map, x: int, y: int) -> int, int {
+    ci := column_index_of(m, x);
+    if ci == -1 return -1, -1;
+    c := m.columns[ci];
+
+    // binary search in sorted column array
+    return ci, array_find_sorted(c.y_pos, y);
+}
 get :: (m: Map, x: int, y: int) -> Tile {
-    i := index_of(m, x, y);
-    return ifx i == -1 then .AIR else m.tiles[i];
+    c, i := index_of(m, x, y);
+    return ifx i == -1 then .AIR else m.columns[c].tiles[i];
 }
-set :: (m: Map, x: int, y: int, tile: Tile) {
-    arr : [2]int;
-    arr[0] = x;
-    arr[1] = y;
-    array_add(*m.positions, arr);
-    array_add(*m.tiles, tile);
+set :: (m: *Map, x: int, y: int, tile: Tile) -> int, int {
+    DEBUG :: false;
+    #if DEBUG print("set: Map %, x %, y %, tile %\n", <<m, x, y, tile);
+    ci := -1;
+    for m.column_postions if it == x then ci = it_index;
+    if ci == -1 {
+        #if DEBUG print("creating new Column\n");
+        c : Column;
+        ci = m.columns.count;
+        array_add(*m.column_postions, x);
+        array_add(*m.columns, c);
+    }
+
+    c := *m.columns[ci];  // if not taken by pointer, copy?
+    ri := set(*m.columns[ci], y, tile);
+
+    return ci, ri;
 }
 
 
-move :: (m: Map, x: int, y: int, dx: int, dy: int) -> bool {
-    indx := index_of(m, x, y);
-    if indx == -1 return false;
-    if m.tiles[indx] != .SAND return false;
+simulate :: (m: *Map, x: int, y: int) -> escape: bool {
+    ci := column_index_of(m, x);
+    if ci == -1 then return true; // there is no column at x with any tile
 
-    new_indx := index_of(m, x+dx, y+dy);
-    if new_indx != -1
-        if m.tiles[new_indx] != .AIR then return false;
+    column := *m.columns[ci];
+    px := x;
+    py := y;
 
-    m.positions[indx][0] = x + dx;
-    m.positions[indx][1] = y + dy;
+    while true {
+        iy := array_find_sorted(column.y_pos, py, true);
+        if iy == column.y_pos.count-1 then return true; // no tile below y
+        iy += 1;
+
+        py = column.y_pos[iy]-1; // one tile up
+        left  := get(m, px-1, py+1);
+        right := get(m, px+1, py+1);
+        if left != .AIR && right != .AIR {  // cannot slide to either side
+            set(column, py, .SAND);
+            return false;
+        } else if left == .AIR {  // first slide left
+            px -= 1;
+        } else {  // then slide right
+            px += 1;
+        }
+        ci = column_index_of(m, px);
+        if ci == -1 then return true;
+        column = *m.columns[ci];
+    }
+
+    assert(false, "unreachable");
     return true;
 }
-simulate :: (m: Map) -> bool {
-    for m.positions if move(m, it[0], it[1],  0, 1) return true;
-    for m.positions if move(m, it[0], it[1], -1, 1) return true;
-    for m.positions if move(m, it[0], it[1],  1, 1) return true;
-    return false;
-}
-out_of_bounds :: (m: Map) -> bool {
-    max_y_wall := 0;
-    max_y_sand := 0;
-    for m.positions {
-        if m.tiles[it_index] == {
-            case .SAND;
-                if it[1] > max_y_sand then max_y_sand = it[1];
-            case .WALL;
-                if it[1] > max_y_wall then max_y_wall = it[1];
-        }
-    }
-    return max_y_sand > max_y_wall;
-}
 
-make_wall_horizontal :: (m: Map, y: int, from_x: int, to_x: int) {
+make_wall_horizontal :: (m: *Map, y: int, from_x: int, to_x: int) {
     fx, tx : int = ---;
     if from_x < to_x {fx = from_x; tx = to_x;}
     else             {fx = to_x; tx = from_x;}
-    for x: fx..tx
-        set(m, x, y, .WALL);
+    for x: fx..tx set(m, x, y, .WALL);
 }
-make_wall_vertical :: (m: Map, x: int, from_y: int, to_y: int) {
+make_wall_vertical :: (m: *Map, x: int, from_y: int, to_y: int) {
+    print("make_wall_vertical\n");
     fy, ty : int = ---;
     if from_y < to_y {fy = from_y; ty = to_y;}
     else             {fy = to_y; ty = from_y;}
-    for y: fy..ty
-        set(m, x, y, .WALL);
+    for y: fy..ty set(m, x, y, .WALL);
 }
 str :: (m: Map) -> string {
 
@@ -87,11 +148,14 @@ str :: (m: Map) -> string {
     min_y : int = 0;
     max_y : int = cast(int)S64_MIN;
 
-    for m.positions {
-        if it[0] < min_x then min_x = it[0];
-        if it[0] > max_x then max_x = it[0];
-        if it[1] < min_y then min_y = it[1];
-        if it[1] > max_y then max_y = it[1];
+    for m.column_postions {
+        if it < min_x then min_x = it;
+        if it > max_x then max_x = it;
+    }
+
+    for m.columns {
+        if it.y_pos[0] < min_y then min_y = it.y_pos[0];
+        if it.y_pos[it.y_pos.count-1] > max_y then max_y = it.y_pos[it.y_pos.count-1];
     }
 
     // print("S32_MIN = %\n", cast(int)S64_MIN);
@@ -134,6 +198,7 @@ part_1 :: (input: string) {
         wall_points : [..][2]int;
         for w, wi: words {
             coords_str := split(w, ",");
+            // print("coords_str = %\n", coords_str);
             wp := array_add(*wall_points);
             (<<wp)[0] = parse_int(*coords_str[0]);
             (<<wp)[1] = parse_int(*coords_str[1]);
@@ -141,13 +206,13 @@ part_1 :: (input: string) {
             if wi == 0 then continue w;
 
             if wall_points[wi-1][0] == wall_points[wi][0] then
-                make_wall_vertical(map, 
+                make_wall_vertical(*map, 
                     x      = wall_points[wi][0], 
                     from_y = wall_points[wi-1][1], 
                     to_y   = wall_points[wi][1]
                 );
             if wall_points[wi-1][1] == wall_points[wi][1] then
-                make_wall_horizontal(map, 
+                make_wall_horizontal(*map, 
                     y      = wall_points[wi][1], 
                     from_x = wall_points[wi-1][0], 
                     to_x   = wall_points[wi][0]
@@ -158,16 +223,22 @@ part_1 :: (input: string) {
 
     print("Map: \n%\n", map);
     print("Map: \n%\n", str(map));
-    set(map,  inflow[0], inflow[1], .SAND);
+    set(*map,  inflow[0], inflow[1], .SAND);
     i := 0;
-    while !out_of_bounds(map) {
-        while simulate(map) && !out_of_bounds(map) {
-            // print("%", str(map));
-        }
-        set(map,  inflow[0], inflow[1], .SAND);
+    while !simulate(*map, inflow[0], inflow[1]) {
+        print("Map: \n%\n", str(map));
         i += 1;
-        // print("%", str(map));
     }
+
+
+    // while !out_of_bounds(map) {
+    //     while simulate(map) && !out_of_bounds(map) {
+    //         // print("%", str(map));
+    //     }
+    //     set(map,  inflow[0], inflow[1], .SAND);
+    //     i += 1;
+    //     // print("%", str(map));
+    // }
 
     print("Map: \n%\n", str(map));
     print("max units of sand: %\n", i-1);
