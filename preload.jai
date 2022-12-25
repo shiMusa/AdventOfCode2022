@@ -19,34 +19,45 @@ trimmed :: (txt: *string, body: Code, flags: For_Flags) #expand {
     }
 }
 
-array_find_sorted :: (array: []$T, val: T, $return_closest_previous_index:=false) -> int {
+
+FindClosest :: enum u8 {
+    NONE;
+    PREVIOUS;
+    NEXT;
+}
+
+array_find_sorted :: (array: []$T, val: T, $closest:=FindClosest.NONE) -> index: int, found: bool {
     DEBUG :: false;
 
-    if !array then return -1;
+    if !array then return -1, false;
 
     min := 0;
     max := array.count-1;
 
-    if val < array[min] return -1;
-    if val > array[max] return #ifx return_closest_previous_index then max; else -1;
+    if val < array[min] #if closest == .NEXT     { return   0, false; } else { return -1, false; };
+    if val > array[max] #if closest == .PREVIOUS { return max, false; } else { return -1, false; };
 
     while true {
         #if DEBUG print("search in (%,%):[%,%]\n", min, max, array[min], array[max]);
-        if val == array[min] return min;
-        if val == array[max] return max;
+        if val == array[min] return min, true;
+        if val == array[max] return max, true;
 
         mid := (max+min)/2;
-        #if DEBUG print("mid (%)[%]\n", mid, array[mid]);
-        if mid == min || mid == max return #ifx return_closest_previous_index min; else -1;
+        #if DEBUG print("mid (%)[%]\n", mid, array[mid    ]);
+        if mid == min || mid == max {
+            #if closest == .PREVIOUS  return min, false;
+            else #if closest == .NEXT return max, false;
+            else                      return  -1, false;
+        }
 
-        if val == array[mid] return mid;
+        if val == array[mid] return mid, true;
 
         if val < array[mid] then max = mid;
         else                     min = mid;
     }
 
     assert(false, "cannot be reached");
-    return -1;
+    return -1, false;
 }
 
 array_insert_sorted :: (array: *[..]$T, val: T, $unique:=false) -> index:int, new_entry:bool {
@@ -69,7 +80,7 @@ array_insert_sorted :: (array: *[..]$T, val: T, $unique:=false) -> index:int, ne
     }
     if val > array.data[max] {
         array_add(array, val);
-        return max, true;
+        return max+1, true;
     }
 
     while true {
@@ -85,14 +96,15 @@ array_insert_sorted :: (array: *[..]$T, val: T, $unique:=false) -> index:int, ne
 
         mid := (max+min)/2;
         #if DEBUG print("mid (%)[%]\n", mid, array.data[mid]);
-        if mid == min || mid == max {
-            array_insert_at(array, val, mid);
-            return mid, true;
-        }
-
+        
         if val == array.data[mid] {
             #if !unique array_insert_at(array, val, mid);
             return mid, true;
+        }
+        
+        if mid == min {
+            array_insert_at(array, val, min+1);
+            return min+1, true;
         }
 
         if val < array.data[mid] then max = mid;
